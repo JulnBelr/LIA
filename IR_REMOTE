@@ -84,7 +84,7 @@ void loop() {
     // Speed control button
     if (code == 0xBF40FF00) {
       y += SPEED_STEP;
-      if (y > MAX_SPEED) y = MAX_SPEED; // cap at 255
+      if (y > MAX_SPEED) y = MIN_SPEED; // cap at 255
       Serial.print("Speed increased to: ");
       Serial.println(y);
     }
