@@ -1,0 +1,140 @@
+#include <Servo.h>
+Servo myservo;
+// Pins for ultrasonic sensor
+const int Trig = 13;
+const int Echo = 12;
+// Motor pins
+int PWMA = 5;
+int AIN1 = 7;
+int PWMB = 6;
+int BIN1 = 8;
+int STBY = 3;
+void setup() {
+  myservo.attach(10);
+  Serial.begin(9600);
+  pinMode(Trig, OUTPUT);
+  pinMode(Echo, INPUT);
+  pinMode(PWMA, OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(STBY, OUTPUT);
+  digitalWrite(STBY, HIGH);
+}
+void loop() {
+  // Look forward
+  myservo.write(90);
+  float forwardDistance = DistanceMeter();
+  // Out of range → safe → go forward
+  if (forwardDistance == 0) {
+    forward(70);
+    return;
+  }
+  // Forward clear → drive normally
+  if (forwardDistance >= 25) {
+    forward(70);
+    return;
+  }
+  // Forward blocked → stop
+  stopMotors();
+  delay(200);
+
+  // -----------------------------------
+  // LOOK LEFT
+  // -----------------------------------
+  myservo.write(150);
+  delay(400);
+  float leftDistance = DistanceMeter();
+  if (leftDistance == 0) leftDistance = 300;
+  if (leftDistance > 25) {
+    Serial.println("Turning LEFT...");
+    left(70);
+    delay(500);
+    return;
+  }
+
+  // -----------------------------------
+  // LOOK RIGHT
+  // -----------------------------------
+  myservo.write(30);
+  delay(400);
+  float rightDistance = DistanceMeter();
+  if (rightDistance == 0) rightDistance = 300;
+  Serial.print("Right distance: ");
+  Serial.println(rightDistance);
+  // ======================================================
+  // NEW RULE:
+  // If RIGHT is blocked (<25) → BACKWARD + 180 TURN + FORWARD
+  // ======================================================
+  if (rightDistance < 25) {
+    Serial.println("RIGHT BLOCKED → BACKWARD + 180 TURN");
+    // Backup
+    backward(70);
+    delay(600);
+    // 180 turn (adjust delay to your robot)
+    left(70);
+    delay(1000);
+    // Go forward again
+    forward(70);
+    delay(500);
+    return;
+  }
+  // If right is safe → turn right normally
+  if (rightDistance > 25) {
+    Serial.println("Turning RIGHT...");
+    right(70);
+    delay(500);
+    return;
+  }
+  stopMotors();
+}
+
+
+// --------------------------------------------------
+// ULTRASONIC DISTANCE FUNCTION
+// --------------------------------------------------
+float DistanceMeter() {
+  digitalWrite(Trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(Trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(Trig, LOW);
+  long duration = pulseIn(Echo, HIGH, 25000);
+  if (duration == 0) return 0;
+  float distance = (duration * 0.0343) / 2.0;
+  if (distance > 300) return 0;
+  return distance;
+}
+
+
+// --------------------------------------------------
+// MOTOR CONTROL
+// --------------------------------------------------
+void forward(int s) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, s);
+}
+void backward(int s) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, s);
+}
+void left(int s) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, s);
+}
+void right(int s) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, s);
+}
+void stopMotors() {
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+}
