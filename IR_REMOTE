@@ -1,0 +1,106 @@
+#include <IRremote.h>
+
+const int IR_RECEIVE_PIN = 9;
+
+// Motor pins
+int PWMA = 5;
+int AIN1 = 7;
+int PWMB = 6;
+int BIN1 = 8;
+int STBY = 3;
+
+// Speed control
+int y = 100;  // starting speed
+const int SPEED_STEP = 5;
+const int MAX_SPEED = 255;
+const int MIN_SPEED = 0;
+
+unsigned long lastCode = 0;
+unsigned long lastSignalTime = 0;
+
+void forward(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+}
+
+void backwards(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+}
+
+void left(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+}
+
+void right(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+}
+
+void stopMotors() {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, 0);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, 0);
+}
+
+void setup() {
+  Serial.begin(9600);
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+  Serial.println("IR Receiver Initialized. Waiting for input...");
+
+  pinMode(PWMA, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(STBY, OUTPUT);
+  digitalWrite(STBY, HIGH);
+}
+
+void loop() {
+  if (IrReceiver.decode()) {
+    unsigned long code = IrReceiver.decodedIRData.decodedRawData;
+    Serial.print("Received HEX Value: 0x");
+    Serial.println(code, HEX);
+    
+    // Repeat code handling (for holding button)
+    if (code == 0x0) {
+      code = lastCode;
+    } else {
+      lastCode = code;
+    }
+
+    lastSignalTime = millis(); // update last received time
+
+    // Speed control button
+    if (code == 0xBF40FF00) {
+      y += SPEED_STEP;
+      if (y > MAX_SPEED) y = MAX_SPEED; // cap at 255
+      Serial.print("Speed increased to: ");
+      Serial.println(y);
+    }
+
+    // Movement controls
+    else if (code == 0xE619FF00) forward(y);      // Forward
+    else if (code == 0xF30CFF00) left(y);         // Left
+    else if (code == 0xA15EFF00) right(y);        // Right
+    else if (code == 0xE31CFF00) backwards(y);    // Backward
+    else stopMotors();
+
+    IrReceiver.resume();
+  }
+
+  // Stop motors automatically if no signal for 150 ms
+  if (millis() - lastSignalTime > 150) {
+    stopMotors();
+  }
+}
