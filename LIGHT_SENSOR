@@ -1,0 +1,105 @@
+// ----------------------------------------
+// Motor pins and variables
+// ----------------------------------------
+const long interval = 1000;
+unsigned long previousMillis = 0;
+int PWMA = 5;   // Left motor speed (PWM)
+int AIN1 = 7;   // Left motor direction
+int PWMB = 6;   // Right motor speed (PWM)
+int BIN1 = 8;   // Right motor direction
+int STBY = 3;   // Standby (must be HIGH to move)
+int pins[] = {5, 7, 6, 8, 3};
+bool specialDone = true;
+
+// ----------------------------------------
+// Movement Functions
+// ----------------------------------------
+void forward(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+}
+void backwards(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+}
+void left(int x) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, x);
+}
+void right(int x) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, x);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, x);
+}
+void stopMotors() {
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+  digitalWrite(AIN1, LOW);
+  digitalWrite(BIN1, LOW);
+}
+
+// ----------------------------------------
+// Setup
+// ----------------------------------------
+void setup() {
+  Serial.begin(9600);
+  
+  for (int i = 0; i < 5; i++) {
+    pinMode(pins[i], OUTPUT);
+  }
+  digitalWrite(STBY, HIGH);
+}
+
+// ----------------------------------------
+// Main Loop
+// ----------------------------------------
+void loop() {
+  float R = analogRead(A0);
+  float M = analogRead(A1);
+  float L = analogRead(A2);
+  Serial.print(L);
+  Serial.print("  ");
+  Serial.print(M);
+  Serial.print("  ");
+  Serial.println(R);
+
+  // -------- EMERGENCY STOP --------
+  if (M > 1000) {
+    stopMotors();
+    return;
+  }
+  // -------- NORMAL BEHAVIOR --------
+  if (L > 400) {
+    left(50);
+    return;
+  }
+  if (M > 400) {
+    forward(50);
+    return;
+  }
+  if (R > 400) {
+    right(50);
+    return;
+  }
+else {
+right(50);
+}
+}
+  // -------- SPECIAL MANEUVER --------
+    // do the maneuver WITHOUT blocking future commands
+    left(50);
+    delay(1000);
+    right(50);
+    delay(1700);
+    return;
+  }
+  // Default fallback
+}
+*/
