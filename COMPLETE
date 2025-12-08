@@ -1,14 +1,35 @@
 #include <Servo.h>
 #include <IRremote.h>
+#include <Adafruit_NeoPixel.h>
 
-// ===== IR CONFIG =====
+// =======================
+// NEO PIXEL CONFIG
+// =======================
+#define LED_PIN 4
+#define NUM_LEDS 1
+Adafruit_NeoPixel led(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+void setLED(uint8_t r, uint8_t g, uint8_t b) {
+  led.setPixelColor(0, led.Color(r, g, b));
+  led.show();
+}
+
+// Mode colors ONLY
+void ledMode1() { setLED(0, 0, 255); }     // Blue
+void ledMode2() { setLED(0, 255, 0); }     // Green
+void ledMode3() { setLED(255, 0, 0); }     // Red
+void ledMode4() { setLED(255, 150, 0); }   // Orange
+
+// =======================
+// IR CONFIG
+// =======================
 const int IR_RECEIVE_PIN = 9;
 unsigned long lastCode = 0;
 unsigned long lastPressTime = 0;
 const int RELEASE_TIMEOUT = 400;
 int mode = 1;
 
-// ===== IR BUTTONS =====
+// IR BUTTONS
 #define BTN_UP      0xB946FF00
 #define BTN_LEFT    0xBB44FF00
 #define BTN_RIGHT   0xBC43FF00
@@ -17,30 +38,42 @@ int mode = 1;
 #define BTN_MODE1   0xE916FF00
 #define BTN_MODE2   0xE619FF00
 #define BTN_MODE3   0xF20DFF00
-#define BTN_MODE4   0xF30CFF00    // NEW: Victory Lap Mode
+#define BTN_MODE4   0xF30CFF00
 
-// ===== MOTOR PINS =====
+// =======================
+// MOTOR CONFIG
+// =======================
 int PWMA = 5, AIN1 = 7;
 int PWMB = 6, BIN1 = 8;
 int STBY = 3;
 
-// ===== SPEED SYSTEM =====
+// SPEED
 int y = 100;
 const int SPEED_STEP = 5;
 const int MAX_SPEED = 255;
 const int MIN_SPEED = 0;
 
-// ===== ULTRASONIC =====
+// =======================
+// ULTRASONIC CONFIG
+// =======================
 Servo myservo;
 const int Trig = 13;
 const int Echo = 12;
 
+// Timer for ultrasonic checks (if needed)
 unsigned long ultrasonicTimer = 0;
 const unsigned long ULTRASONIC_INTERVAL = 50;
 
+// =======================
+// SETUP
+// =======================
 void setup() {
   Serial.begin(9600);
   IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+
+  led.begin();
+  led.show();
+  ledMode1();  // Default boot color
 
   pinMode(PWMA, OUTPUT); pinMode(AIN1, OUTPUT);
   pinMode(PWMB, OUTPUT); pinMode(BIN1, OUTPUT);
@@ -53,8 +86,10 @@ void setup() {
   Serial.println("System Booted — Ready");
 }
 
+// =======================
+// LOOP
+// =======================
 void loop() {
-
   // ==== IR READ ====
   if (IrReceiver.decode()) {
     unsigned long code = IrReceiver.decodedIRData.decodedRawData;
@@ -62,11 +97,11 @@ void loop() {
     if (code != 0x0) lastCode = code;
     lastPressTime = millis();
 
-    // ===== MODE SWITCHING =====
-    if (lastCode == BTN_MODE1) { mode = 1; Serial.println("MODE 1: IR Drive"); }
-    if (lastCode == BTN_MODE2) { mode = 2; Serial.println("MODE 2: Analog Auto"); }
-    if (lastCode == BTN_MODE3) { mode = 3; Serial.println("MODE 3: Ultrasonic Avoid"); }
-    if (lastCode == BTN_MODE4) { mode = 4; Serial.println("MODE 4: Victory Lap Rectangle!"); }
+    // ===== MODE SWITCHING (LED SET HERE ONLY) =====
+    if (lastCode == BTN_MODE1) { mode = 1; ledMode1(); Serial.println("MODE 1"); }
+    if (lastCode == BTN_MODE2) { mode = 2; ledMode2(); Serial.println("MODE 2"); }
+    if (lastCode == BTN_MODE3) { mode = 3; ledMode3(); Serial.println("MODE 3"); }
+    if (lastCode == BTN_MODE4) { mode = 4; ledMode4(); Serial.println("MODE 4"); }
 
     IrReceiver.resume();
   }
@@ -80,9 +115,9 @@ void loop() {
   }
 }
 
-///////////////////////////////////////////////////////////////
-//==================== MODE 1 : HOLD TO MOVE =================//
-///////////////////////////////////////////////////////////////
+// =======================
+// MODE 1 – IR HOLD TO MOVE
+// =======================
 void modeIRControl() {
   if (lastCode == BTN_OK){
     y += SPEED_STEP;
@@ -105,9 +140,9 @@ void modeIRControl() {
   }
 }
 
-///////////////////////////////////////////////////////////////
-//==================== MODE 2 : ANALOG SENSOR ================//
-///////////////////////////////////////////////////////////////
+// =======================
+// MODE 2 – ANALOG SENSOR
+// =======================
 void modeAnalogSensor() {
   float R = analogRead(A0);
   float M = analogRead(A1);
@@ -121,103 +156,113 @@ void modeAnalogSensor() {
   right(50);
 }
 
-///////////////////////////////////////////////////////////////
-//==================== MODE 3 : ULTRASONIC ====================//
-///////////////////////////////////////////////////////////////
+// =======================
+// MODE 3 – ULTRASONIC AVOID (UPDATED)
+// =======================
 void modeUltrasonic() {
-
-  if (millis() - ultrasonicTimer < ULTRASONIC_INTERVAL) return;
-  ultrasonicTimer = millis();
-
+  // Look forward
   myservo.write(90);
-  float front = DistanceMeter();
-  if (front == 0 || front >= 25) { forward(70); return; }
+  float forwardDistance = DistanceMeter();
 
-  stopMotors();
-
-  myservo.write(150);
-  delay(500);
-  float leftD = DistanceMeter(); if (leftD == 0) leftD = 300;
-  if (leftD > 25) { left(70); return; }
-
-  myservo.write(30);
-  delay(500);
-  float rightD = DistanceMeter(); if (rightD == 0) rightD = 300;
-
-  if (rightD < 25) {
-    backward(70); delay(600);
-    left(70); delay(1000);
+  if (forwardDistance == 0) {
     forward(70);
     return;
   }
 
-  right(70);
-}
-
-///////////////////////////////////////////////////////////////
-//============== MODE 4 : VICTORY LAP RECTANGLE ===============//
-///////////////////////////////////////////////////////////////
-void modeVictoryLap() {
-
-  Serial.println("Running rectangle perimeter!");
-
-  // === LONG SIDE (12s) ===
-  forward(50);
-  delay(12000);
-
-  // Turn 90°
-  left(50);
-  delay(600);
-
-  // === SHORT SIDE (5s) ===
-  forward(50);
-  delay(5000);
-
-  // Turn 90°
-  left(50);
-  delay(600);
-
-  // === LONG SIDE (12s) ===
-  forward(50);
-  delay(12000);
-
-  // Turn 90°
-  left(50);
-  delay(600);
-
-  // === SHORT SIDE (5s) ===
-  forward(50);
-  delay(5000);
-
-  // Final 90° turn to align back at start
-  left(50);
-  delay(600);
-
-  // Celebration Spin!
-  Serial.println("Victory spin!");
-  left(70);
-  delay(2000);
+  if (forwardDistance >= 25) {
+    forward(70);
+    return;
+  }
 
   stopMotors();
+  delay(200);
 
-  // Stay stopped after finishing
+  // LOOK LEFT
+  myservo.write(180);
+  delay(400);
+  float leftDistance = DistanceMeter();
+  if (leftDistance == 0) leftDistance = 300;
+  if (leftDistance > 25) {
+    Serial.println("Turning LEFT...");
+    left(70);
+    delay(500);
+    return;
+  }
+
+  // LOOK RIGHT
+  myservo.write(0);
+  delay(400);
+  float rightDistance = DistanceMeter();
+  if (rightDistance == 0) rightDistance = 300;
+  Serial.print("Right distance: ");
+  Serial.println(rightDistance);
+
+  // RIGHT BLOCKED → BACKWARD + 180 TURN + FORWARD
+  if (rightDistance < 25) {
+    Serial.println("RIGHT BLOCKED → BACKWARD + 180 TURN");
+    backward(70);
+    delay(600);
+    left(70);
+    delay(1000);
+    forward(70);
+    delay(500);
+    return;
+  }
+
+  // RIGHT SAFE → turn right normally
+  if (rightDistance > 25) {
+    Serial.println("Turning RIGHT...");
+    right(70);
+    delay(500);
+    return;
+  }
+
+  stopMotors();
 }
 
-///////////////////////////////////////////////////////////////
-//========================== FUNCTIONS ========================//
-///////////////////////////////////////////////////////////////
+// =======================
+// ULTRASONIC DISTANCE FUNCTION
+// =======================
 float DistanceMeter() {
-  digitalWrite(Trig, LOW); delayMicroseconds(2);
-  digitalWrite(Trig, HIGH); delayMicroseconds(10);
+  digitalWrite(Trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(Trig, HIGH);
+  delayMicroseconds(10);
   digitalWrite(Trig, LOW);
 
-  long d = pulseIn(Echo, HIGH, 25000);
-  if (!d) return 0;
+  long duration = pulseIn(Echo, HIGH, 25000);
+  if (duration == 0) return 0;
 
-  float cm = (d * 0.0343) / 2;
-  return (cm > 300) ? 0 : cm;
+  float distance = (duration * 0.0343) / 2.0;
+  if (distance > 300) return 0;
+  return distance;
 }
 
+// =======================
+// MODE 4 – VICTORY LAP RECTANGLE
+// =======================
+void modeVictoryLap() {
+  forward(50); delay(12000);
+  left(50); delay(600);
+
+  forward(50); delay(5000);
+  left(50); delay(600);
+
+  forward(50); delay(12000);
+  left(50); delay(600);
+
+  forward(50); delay(5000);
+  left(50); delay(600);
+
+  // Celebration spin
+  left(70); delay(2000);
+
+  stopMotors();
+}
+
+// =======================
+// MOTOR FUNCTIONS
+// =======================
 void forward(int s){ digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,HIGH); analogWrite(PWMB,s); }
 void backward(int s){ digitalWrite(AIN1,LOW); analogWrite(PWMA,s); digitalWrite(BIN1,LOW); analogWrite(PWMB,s); }
 void left(int s){ digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,LOW); analogWrite(PWMB,s); }
