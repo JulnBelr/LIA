@@ -1,106 +1,143 @@
-#include <IRremote.h>
+#include <IRremote.h>              // Library for receiving IR remote signals
 
-const int IR_RECEIVE_PIN = 9;
+// =====================================================
+//                IR RECEIVER CONFIG
+// =====================================================
+const int IR_RECEIVE_PIN = 9;      // Digital pin connected to IR receiver
 
-// Motor pins
-int PWMA = 5;
-int AIN1 = 7;
-int PWMB = 6;
-int BIN1 = 8;
-int STBY = 3;
+// =====================================================
+//                MOTOR DRIVER PINS
+// =====================================================
+int PWMA = 5;                      // PWM pin for Motor A (speed control)
+int AIN1 = 7;                      // Direction pin for Motor A
+int PWMB = 6;                      // PWM pin for Motor B (speed control)
+int BIN1 = 8;                      // Direction pin for Motor B
+int STBY = 3;                      // Standby pin (must be HIGH to enable motors)
 
-// Speed control
-int y = 100;  // starting speed
-const int SPEED_STEP = 5;
-const int MAX_SPEED = 255;
-const int MIN_SPEED = 0;
+// =====================================================
+//                SPEED CONTROL SYSTEM
+// =====================================================
+int y = 100;                       // Current motor speed (starting value)
+const int SPEED_STEP = 5;          // Amount speed changes per button press
+const int MAX_SPEED = 255;         // Maximum allowed motor speed
+const int MIN_SPEED = 0;           // Minimum allowed motor speed
 
-unsigned long lastCode = 0;
-unsigned long lastSignalTime = 0;
+// =====================================================
+//                IR STATE TRACKING
+// =====================================================
+unsigned long lastCode = 0;        // Stores last valid IR button code
+unsigned long lastSignalTime = 0;  // Stores time of last IR signal
 
+// =====================================================
+//                MOTOR MOVEMENT FUNCTIONS
+// =====================================================
+
+// Move robot forward
 void forward(int x) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, HIGH);        // Set Motor A direction forward
+  analogWrite(PWMA, x);            // Set Motor A speed
+  digitalWrite(BIN1, HIGH);        // Set Motor B direction forward
+  analogWrite(PWMB, x);            // Set Motor B speed
 }
 
+// Move robot backward
 void backwards(int x) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, LOW);         // Set Motor A direction backward
+  analogWrite(PWMA, x);            // Set Motor A speed
+  digitalWrite(BIN1, LOW);         // Set Motor B direction backward
+  analogWrite(PWMB, x);            // Set Motor B speed
 }
 
+// Turn robot left
 void left(int x) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, HIGH);        // Left motor forward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, LOW);         // Right motor backward
+  analogWrite(PWMB, x);            // Right motor speed
 }
 
+// Turn robot right
 void right(int x) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, LOW);         // Left motor backward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, HIGH);        // Right motor forward
+  analogWrite(PWMB, x);            // Right motor speed
 }
 
+// Stop both motors
 void stopMotors() {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, 0);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, 0);
+  digitalWrite(AIN1, LOW);         // Stop Motor A direction
+  analogWrite(PWMA, 0);            // Stop Motor A speed
+  digitalWrite(BIN1, LOW);         // Stop Motor B direction
+  analogWrite(PWMB, 0);            // Stop Motor B speed
 }
 
+// =====================================================
+//                SETUP FUNCTION
+// =====================================================
 void setup() {
-  Serial.begin(9600);
-  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+  Serial.begin(9600);              // Start serial communication
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK); // Start IR receiver
   Serial.println("IR Receiver Initialized. Waiting for input...");
 
-  pinMode(PWMA, OUTPUT);
-  pinMode(PWMB, OUTPUT);
-  pinMode(AIN1, OUTPUT);
-  pinMode(BIN1, OUTPUT);
-  pinMode(STBY, OUTPUT);
-  digitalWrite(STBY, HIGH);
+  pinMode(PWMA, OUTPUT);           // Motor A speed pin
+  pinMode(PWMB, OUTPUT);           // Motor B speed pin
+  pinMode(AIN1, OUTPUT);           // Motor A direction pin
+  pinMode(BIN1, OUTPUT);           // Motor B direction pin
+  pinMode(STBY, OUTPUT);           // Motor driver standby pin
+  digitalWrite(STBY, HIGH);        // Enable motor driver
 }
 
+// =====================================================
+//                MAIN LOOP
+// =====================================================
 void loop() {
+
+  // Check if an IR signal was received
   if (IrReceiver.decode()) {
-    unsigned long code = IrReceiver.decodedIRData.decodedRawData;
-    Serial.print("Received HEX Value: 0x");
+
+    unsigned long code = IrReceiver.decodedIRData.decodedRawData; // Read IR code
+
+    Serial.print("Received HEX Value: 0x"); // Print received code
     Serial.println(code, HEX);
-    
-    // Repeat code handling (for holding button)
-    if (code == 0x0) {
-      code = lastCode;
+
+    // =================================================
+    //        HANDLE BUTTON HOLD (REPEAT CODE)
+    // =================================================
+    if (code == 0x0) {              // If repeat signal received
+      code = lastCode;              // Use last stored button
     } else {
-      lastCode = code;
+      lastCode = code;              // Save new button code
     }
 
-    lastSignalTime = millis(); // update last received time
+    lastSignalTime = millis();      // Update time of last IR signal
 
-    // Speed control button
-    if (code == 0xBF40FF00) {
-      y += SPEED_STEP;
-      if (y > MAX_SPEED) y = MIN_SPEED; // cap at 255
+    // =================================================
+    //               SPEED CONTROL
+    // =================================================
+    if (code == 0xBF40FF00) {        // Speed increase button
+      y += SPEED_STEP;              // Increase speed
+      if (y > MAX_SPEED) y = MIN_SPEED; // Wrap speed back to minimum
       Serial.print("Speed increased to: ");
       Serial.println(y);
     }
 
-    // Movement controls
-    else if (code == 0xE619FF00) forward(y);      // Forward
-    else if (code == 0xF30CFF00) left(y);         // Left
-    else if (code == 0xA15EFF00) right(y);        // Right
-    else if (code == 0xE31CFF00) backwards(y);    // Backward
-    else stopMotors();
+    // =================================================
+    //               MOVEMENT CONTROL
+    // =================================================
+    else if (code == 0xE619FF00) forward(y);     // Forward button
+    else if (code == 0xF30CFF00) left(y);        // Left button
+    else if (code == 0xA15EFF00) right(y);       // Right button
+    else if (code == 0xE31CFF00) backwards(y);   // Backward button
+    else stopMotors();                           // Unknown input → stop
 
-    IrReceiver.resume();
+    IrReceiver.resume();            // Prepare IR receiver for next signal
   }
 
-  // Stop motors automatically if no signal for 150 ms
-  if (millis() - lastSignalTime > 150) {
-    stopMotors();
+  // =================================================
+  //        AUTO STOP IF BUTTON RELEASED
+  // =================================================
+  if (millis() - lastSignalTime > 150) { // No IR signal recently
+    stopMotors();                        // Stop robot
   }
 }
