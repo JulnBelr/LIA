@@ -1,1 +1,101 @@
+// ========================================
+// STANDALONE VICTORY LAP – FULL MOTOR SET
+// ========================================
+
+// -------- Motor Pins --------
+int PWMA = 5;   // Left motor PWM
+int AIN1 = 7;   // Left motor direction
+int PWMB = 6;   // Right motor PWM
+int BIN1 = 8;   // Right motor direction
+int STBY = 3;   // Standby pin (enable motors)
+
+// ----------------------------------------
+// Setup
+// ----------------------------------------
+void setup() {
+
+  pinMode(PWMA, OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(STBY, OUTPUT);
+
+  digitalWrite(STBY, HIGH); // Enable motor driver
+}
+
+// ----------------------------------------
+// Main Loop (runs once)
+// ----------------------------------------
+void loop() {
+
+  // -------- LAP 1 --------
+  forward(150);
+  delay(6000);
+  left(130);
+  delay(700);
+
+  // -------- LAP 2 --------
+  forward(150);
+  delay(3500);
+  left(130);
+  delay(700);
+
+  // -------- LAP 3 --------
+  forward(150);
+  delay(6000);
+  left(130);
+  delay(700);
+
+  // -------- LAP 4 --------
+  forward(150);
+  delay(3500);
+  left(130);
+  delay(700);
+
+  // SPIN!!
+  right(255);
+  while (true);
+}
+
+// ----------------------------------------
+// MOTOR CONTROL FUNCTIONS
+// ----------------------------------------
+
+// Move forward
+void forward(int s) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, s);
+}
+
+// Move backward
+void backward(int s) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, s);
+}
+
+// Turn left
+void left(int s) {
+  digitalWrite(AIN1, HIGH);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, LOW);
+  analogWrite(PWMB, s);
+}
+
+// Turn right
+void right(int s) {
+  digitalWrite(AIN1, LOW);
+  analogWrite(PWMA, s);
+  digitalWrite(BIN1, HIGH);
+  analogWrite(PWMB, s);
+}
+
+// Stop all motors
+void stopMotors() {
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+}
 
