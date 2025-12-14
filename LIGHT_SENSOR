@@ -1,69 +1,93 @@
 // ----------------------------------------
-// Motor pins and variables
+// Motor timing variables (currently unused)
 // ----------------------------------------
-const long interval = 1000;
-unsigned long previousMillis = 0;
-int PWMA = 5;   // Left motor speed (PWM)
-int AIN1 = 7;   // Left motor direction
-int PWMB = 6;   // Right motor speed (PWM)
-int BIN1 = 8;   // Right motor direction
-int STBY = 3;   // Standby (must be HIGH to move)
+const long interval = 1000;        // Time interval variable (not used yet)
+unsigned long previousMillis = 0;  // Stores last time event happened
+
+// ----------------------------------------
+// Motor pins
+// ----------------------------------------
+int PWMA = 5;    // PWM pin for LEFT motor speed
+int AIN1 = 7;    // Direction pin for LEFT motor
+int PWMB = 6;    // PWM pin for RIGHT motor speed
+int BIN1 = 8;    // Direction pin for RIGHT motor
+int STBY = 3;    // Standby pin (must be HIGH to enable motors)
+
+// Array holding all motor-related pins
 int pins[] = {5, 7, 6, 8, 3};
+
+// Flag for special maneuver (not used in loop)
 bool specialDone = true;
 
 // ----------------------------------------
 // Movement Functions
 // ----------------------------------------
+
+// Move robot forward
 void forward(int x) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, HIGH);        // Left motor forward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, HIGH);        // Right motor forward
+  analogWrite(PWMB, x);            // Right motor speed
 }
+
+// Move robot backward
 void backwards(int x) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, LOW);         // Left motor backward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, LOW);         // Right motor backward
+  analogWrite(PWMB, x);            // Right motor speed
 }
+
+// Turn robot left
 void left(int x) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, HIGH);        // Left motor forward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, LOW);         // Right motor backward
+  analogWrite(PWMB, x);            // Right motor speed
 }
+
+// Turn robot right
 void right(int x) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, x);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, x);
+  digitalWrite(AIN1, LOW);         // Left motor backward
+  analogWrite(PWMA, x);            // Left motor speed
+  digitalWrite(BIN1, HIGH);        // Right motor forward
+  analogWrite(PWMB, x);            // Right motor speed
 }
+
+// Stop both motors
 void stopMotors() {
-  analogWrite(PWMA, 0);
-  analogWrite(PWMB, 0);
-  digitalWrite(AIN1, LOW);
-  digitalWrite(BIN1, LOW);
+  analogWrite(PWMA, 0);            // Stop left motor
+  analogWrite(PWMB, 0);            // Stop right motor
+  digitalWrite(AIN1, LOW);         // Disable left motor direction
+  digitalWrite(BIN1, LOW);         // Disable right motor direction
 }
 
 // ----------------------------------------
 // Setup
 // ----------------------------------------
 void setup() {
-  Serial.begin(9600);
-  
+  Serial.begin(9600);              // Start Serial Monitor
+
+  // Set all motor-related pins as OUTPUT
   for (int i = 0; i < 5; i++) {
     pinMode(pins[i], OUTPUT);
   }
-  digitalWrite(STBY, HIGH);
+
+  digitalWrite(STBY, HIGH);        // Enable motor driver
 }
 
 // ----------------------------------------
 // Main Loop
 // ----------------------------------------
 void loop() {
-  float R = analogRead(A0);
-  float M = analogRead(A1);
-  float L = analogRead(A2);
+
+  // Read line sensors
+  float R = analogRead(A0);        // Right sensor
+  float M = analogRead(A1);        // Middle sensor
+  float L = analogRead(A2);        // Left sensor
+
+  // Print sensor values for debugging
   Serial.print(L);
   Serial.print("  ");
   Serial.print(M);
@@ -71,35 +95,28 @@ void loop() {
   Serial.println(R);
 
   // -------- EMERGENCY STOP --------
-  if (M > 1000) {
-    stopMotors();
+  if (M > 1000) {                  // Very strong middle signal
+    stopMotors();                  // Stop immediately
+    return;                        // Exit loop early
+  }
+
+  // -------- NORMAL LINE FOLLOWING --------
+  if (L > 400) {                   // Line detected on left
+    left(50);                      // Turn left
     return;
   }
-  // -------- NORMAL BEHAVIOR --------
-  if (L > 400) {
-    left(50);
+
+  if (M > 400) {                   // Line detected in center
+    forward(50);                   // Go straight
     return;
   }
-  if (M > 400) {
-    forward(50);
+
+  if (R > 400) {                   // Line detected on right
+    right(50);                     // Turn right
     return;
   }
-  if (R > 400) {
-    right(50);
-    return;
+
+  else {
+    right(50);                     // Default behavior if nothing detected
   }
-else {
-right(50);
 }
-}
-  // -------- SPECIAL MANEUVER --------
-    // do the maneuver WITHOUT blocking future commands
-    left(50);
-    delay(1000);
-    right(50);
-    delay(1700);
-    return;
-  }
-  // Default fallback
-}
-*/
