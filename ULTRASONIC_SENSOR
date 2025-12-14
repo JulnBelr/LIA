@@ -1,140 +1,190 @@
-#include <Servo.h>
-Servo myservo;
-// Pins for ultrasonic sensor
-const int Trig = 13;
-const int Echo = 12;
-// Motor pins
-int PWMA = 5;
-int AIN1 = 7;
-int PWMB = 6;
-int BIN1 = 8;
-int STBY = 3;
+#include <Servo.h>                 // Include Servo library to control servo motors
+
+Servo myservo;                     // Create a Servo object
+
+// ----------------------------------------
+// Ultrasonic sensor pins
+// ----------------------------------------
+const int Trig = 13;               // Trigger pin (sends ultrasonic pulse)
+const int Echo = 12;               // Echo pin (receives reflected pulse)
+
+// ----------------------------------------
+// Motor driver pins
+// ----------------------------------------
+int PWMA = 5;                      // PWM pin for LEFT motor speed
+int AIN1 = 7;                      // Direction pin for LEFT motor
+int PWMB = 6;                      // PWM pin for RIGHT motor speed
+int BIN1 = 8;                      // Direction pin for RIGHT motor
+int STBY = 3;                      // Standby pin (must be HIGH to enable motors)
+
+// ----------------------------------------
+// Setup function (runs once)
+// ----------------------------------------
 void setup() {
-  myservo.attach(10);
-  Serial.begin(9600);
-  pinMode(Trig, OUTPUT);
-  pinMode(Echo, INPUT);
-  pinMode(PWMA, OUTPUT);
+
+  myservo.attach(10);              // Attach servo to pin 10
+  Serial.begin(9600);              // Start Serial Monitor for debugging
+
+  pinMode(Trig, OUTPUT);           // Set trigger pin as OUTPUT
+  pinMode(Echo, INPUT);            // Set echo pin as INPUT
+
+  pinMode(PWMA, OUTPUT);           // Set motor pins as OUTPUT
   pinMode(AIN1, OUTPUT);
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(STBY, OUTPUT);
-  digitalWrite(STBY, HIGH);
+
+  digitalWrite(STBY, HIGH);        // Enable motor driver
 }
+
+// ----------------------------------------
+// Main loop (runs forever)
+// ----------------------------------------
 void loop() {
-  // Look forward
-  myservo.write(90);
-  float forwardDistance = DistanceMeter();
-  // Out of range → safe → go forward
+
+  // -----------------------------
+  // LOOK FORWARD
+  // -----------------------------
+  myservo.write(90);               // Point servo straight ahead
+  float forwardDistance = DistanceMeter(); // Measure forward distance
+
+  // If ultrasonic sensor returns 0 → out of range → path is clear
   if (forwardDistance == 0) {
-    forward(70);
-    return;
+    forward(70);                   // Move forward
+    return;                        // Exit loop early
   }
-  // Forward clear → drive normally
+
+  // If forward distance is safe (>= 25 cm)
   if (forwardDistance >= 25) {
-    forward(70);
-    return;
+    forward(70);                   // Move forward
+    return;                        // Exit loop early
   }
-  // Forward blocked → stop
-  stopMotors();
-  delay(200);
+
+  // Forward path is blocked
+  stopMotors();                    // Stop motors
+  delay(200);                      // Short pause
 
   // -----------------------------------
   // LOOK LEFT
   // -----------------------------------
-  myservo.write(150);
-  delay(400);
-  float leftDistance = DistanceMeter();
-  if (leftDistance == 0) leftDistance = 300;
-  if (leftDistance > 25) {
+  myservo.write(150);              // Rotate servo to the left
+  delay(400);                      // Wait for servo to reach position
+
+  float leftDistance = DistanceMeter(); // Measure left distance
+
+  if (leftDistance == 0)           // If out of range
+    leftDistance = 300;            // Treat as clear path
+
+  if (leftDistance > 25) {         // If left side is clear
     Serial.println("Turning LEFT...");
-    left(70);
-    delay(500);
-    return;
+    left(70);                      // Turn left
+    delay(500);                    // Allow turn to complete
+    return;                        // Exit loop early
   }
 
   // -----------------------------------
   // LOOK RIGHT
   // -----------------------------------
-  myservo.write(30);
-  delay(400);
-  float rightDistance = DistanceMeter();
-  if (rightDistance == 0) rightDistance = 300;
+  myservo.write(30);               // Rotate servo to the right
+  delay(400);                      // Wait for servo
+
+  float rightDistance = DistanceMeter(); // Measure right distance
+
+  if (rightDistance == 0)          // If out of range
+    rightDistance = 300;           // Treat as clear
+
   Serial.print("Right distance: ");
-  Serial.println(rightDistance);
+  Serial.println(rightDistance);   // Print right distance
+
   // ======================================================
   // NEW RULE:
-  // If RIGHT is blocked (<25) → BACKWARD + 180 TURN + FORWARD
+  // If RIGHT is blocked (<25 cm)
+  // → BACKWARD + 180 TURN + FORWARD
   // ======================================================
   if (rightDistance < 25) {
+
     Serial.println("RIGHT BLOCKED → BACKWARD + 180 TURN");
-    // Backup
-    backward(70);
-    delay(600);
-    // 180 turn (adjust delay to your robot)
-    left(70);
-    delay(1000);
-    // Go forward again
-    forward(70);
-    delay(500);
-    return;
+
+    backward(70);                  // Move backward
+    delay(600);                    // Back up distance
+
+    left(70);                      // Turn left (180-degree turn)
+    delay(1000);                   // Adjust for full turn
+
+    forward(70);                   // Resume forward movement
+    delay(500);                    // Stabilize movement
+
+    return;                        // Exit loop early
   }
-  // If right is safe → turn right normally
+
+  // If right side is clear
   if (rightDistance > 25) {
     Serial.println("Turning RIGHT...");
-    right(70);
-    delay(500);
-    return;
+    right(70);                     // Turn right
+    delay(500);                    // Allow turn
+    return;                        // Exit loop early
   }
-  stopMotors();
-}
 
+  stopMotors();                    // Safety stop if no condition met
+}
 
 // --------------------------------------------------
 // ULTRASONIC DISTANCE FUNCTION
 // --------------------------------------------------
 float DistanceMeter() {
-  digitalWrite(Trig, LOW);
-  delayMicroseconds(2);
-  digitalWrite(Trig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(Trig, LOW);
-  long duration = pulseIn(Echo, HIGH, 25000);
-  if (duration == 0) return 0;
-  float distance = (duration * 0.0343) / 2.0;
-  if (distance > 300) return 0;
-  return distance;
+
+  digitalWrite(Trig, LOW);         // Ensure trigger is LOW
+  delayMicroseconds(2);            // Short delay
+
+  digitalWrite(Trig, HIGH);        // Send ultrasonic pulse
+  delayMicroseconds(10);           // Pulse duration
+  digitalWrite(Trig, LOW);         // Stop pulse
+
+  long duration = pulseIn(Echo, HIGH, 25000); // Measure echo time
+
+  if (duration == 0)               // No echo received
+    return 0;                      // Out of range
+
+  float distance = (duration * 0.0343) / 2.0; // Convert to cm
+
+  if (distance > 300)              // Ignore very large values
+    return 0;
+
+  return distance;                 // Return distance in cm
 }
 
-
 // --------------------------------------------------
-// MOTOR CONTROL
+// MOTOR CONTROL FUNCTIONS
 // --------------------------------------------------
 void forward(int s) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, s);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, s);
+  digitalWrite(AIN1, HIGH);        // Left motor forward
+  analogWrite(PWMA, s);            // Left motor speed
+  digitalWrite(BIN1, HIGH);        // Right motor forward
+  analogWrite(PWMB, s);            // Right motor speed
 }
+
 void backward(int s) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, s);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, s);
+  digitalWrite(AIN1, LOW);         // Left motor backward
+  analogWrite(PWMA, s);            // Left motor speed
+  digitalWrite(BIN1, LOW);         // Right motor backward
+  analogWrite(PWMB, s);            // Right motor speed
 }
+
 void left(int s) {
-  digitalWrite(AIN1, HIGH);
-  analogWrite(PWMA, s);
-  digitalWrite(BIN1, LOW);
-  analogWrite(PWMB, s);
+  digitalWrite(AIN1, HIGH);        // Left motor forward
+  analogWrite(PWMA, s);            // Left motor speed
+  digitalWrite(BIN1, LOW);         // Right motor backward
+  analogWrite(PWMB, s);            // Right motor speed
 }
+
 void right(int s) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(PWMA, s);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(PWMB, s);
+  digitalWrite(AIN1, LOW);         // Left motor backward
+  analogWrite(PWMA, s);            // Left motor speed
+  digitalWrite(BIN1, HIGH);        // Right motor forward
+  analogWrite(PWMB, s);            // Right motor speed
 }
+
 void stopMotors() {
-  analogWrite(PWMA, 0);
-  analogWrite(PWMB, 0);
+  analogWrite(PWMA, 0);            // Stop left motor
+  analogWrite(PWMB, 0);            // Stop right motor
 }
