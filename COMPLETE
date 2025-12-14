@@ -1,31 +1,40 @@
+```cpp
+#include <Servo.h>                 // Servo library for ultrasonic sensor rotation
+#include <IRremote.h>              // IR remote control library
+#include <Adafruit_NeoPixel.h>     // NeoPixel LED control library
 
-#include <Servo.h>
-#include <IRremote.h>
-#include <Adafruit_NeoPixel.h>
-// =======================
-// NEO PIXEL CONFIG
-// =======================
-#define LED_PIN 4
-#define NUM_LEDS 1
+// =====================================================
+// NEO PIXEL CONFIGURATION
+// =====================================================
+#define LED_PIN 4                  // Data pin for NeoPixel
+#define NUM_LEDS 1                 // Number of NeoPixels used
+
+// Create NeoPixel object
 Adafruit_NeoPixel led(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// Set RGB color of the NeoPixel
 void setLED(uint8_t r, uint8_t g, uint8_t b) {
   led.setPixelColor(0, led.Color(r, g, b));
   led.show();
 }
-// Mode colors ONLY
-void ledMode1() { setLED(0, 0, 255); }     // Blue
-void ledMode2() { setLED(0, 255, 0); }     // Green
-void ledMode3() { setLED(255, 0, 0); }     // Red
-void ledMode4() { setLED(255, 150, 0); }   // Orange
-// =======================
-// IR CONFIG
-// =======================
-const int IR_RECEIVE_PIN = 9;
-unsigned long lastCode = 0;
-unsigned long lastPressTime = 0;
-const int RELEASE_TIMEOUT = 400;
-int mode = 1;
-// IR BUTTONS
+
+// Mode indicator colors ONLY
+void ledMode1() { setLED(0, 0, 255); }     // Blue  → Mode 1 (IR Control)
+void ledMode2() { setLED(0, 255, 0); }     // Green → Mode 2 (Analog Sensor)
+void ledMode3() { setLED(255, 0, 0); }     // Red   → Mode 3 (Ultrasonic Avoid)
+void ledMode4() { setLED(255, 150, 0); }   // Orange→ Mode 4 (Victory Lap)
+
+// =====================================================
+// IR REMOTE CONFIGURATION
+// =====================================================
+const int IR_RECEIVE_PIN = 9;       // IR receiver signal pin
+unsigned long lastCode = 0;         // Stores last valid IR button
+unsigned long lastPressTime = 0;    // Time of last IR signal
+const int RELEASE_TIMEOUT = 400;    // Stop motors if button released
+
+int mode = 1;                       // Default startup mode
+
+// IR button hex codes
 #define BTN_UP      0xB946FF00
 #define BTN_LEFT    0xBB44FF00
 #define BTN_RIGHT   0xBC43FF00
@@ -35,139 +44,161 @@ int mode = 1;
 #define BTN_MODE2   0xE619FF00
 #define BTN_MODE3   0xF20DFF00
 #define BTN_MODE4   0xF30CFF00
-// =======================
-// MOTOR CONFIG
-// =======================
-int PWMA = 5, AIN1 = 7;
-int PWMB = 6, BIN1 = 8;
-int STBY = 3;
-// SPEED
-int y = 100;
-const int SPEED_STEP = 5;
-const int MAX_SPEED = 255;
-const int MIN_SPEED = 0;
-// =======================
-// ULTRASONIC CONFIG
-// =======================
-Servo myservo;
-const int Trig = 13;
-const int Echo = 12;
-// Timer for ultrasonic checks (if needed)
-unsigned long ultrasonicTimer = 0;
-const unsigned long ULTRASONIC_INTERVAL = 50;
-// =======================
-// SETUP
-// =======================
+
+// =====================================================
+// MOTOR DRIVER CONFIGURATION
+// =====================================================
+int PWMA = 5, AIN1 = 7;             // Left motor PWM & direction
+int PWMB = 6, BIN1 = 8;             // Right motor PWM & direction
+int STBY = 3;                       // Standby pin (enable motors)
+
+// Speed control variables
+int y = 100;                        // Current speed
+const int SPEED_STEP = 5;           // Speed increment
+const int MAX_SPEED = 255;          // Maximum speed
+const int MIN_SPEED = 0;            // Minimum speed
+
+// =====================================================
+// ULTRASONIC SENSOR + SERVO CONFIG
+// =====================================================
+Servo myservo;                      // Servo for ultrasonic scanning
+const int Trig = 13;                // Ultrasonic trigger pin
+const int Echo = 12;                // Ultrasonic echo pin
+
+// =====================================================
+// SETUP FUNCTION
+// =====================================================
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(9600);                               // Start serial monitor
   IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
-  led.begin();
+
+  led.begin();                                      // Initialize NeoPixel
   led.show();
-  ledMode1();  // Default boot color
+  ledMode1();                                       // Default LED color
+
+  // Motor pin setup
   pinMode(PWMA, OUTPUT); pinMode(AIN1, OUTPUT);
   pinMode(PWMB, OUTPUT); pinMode(BIN1, OUTPUT);
   pinMode(STBY, OUTPUT); digitalWrite(STBY, HIGH);
-  pinMode(Trig, OUTPUT); pinMode(Echo, INPUT);
-  myservo.attach(10);
+
+  // Ultrasonic sensor pins
+  pinMode(Trig, OUTPUT);
+  pinMode(Echo, INPUT);
+
+  myservo.attach(10);                               // Attach servo to pin 10
   Serial.println("System Booted — Ready");
 }
-// =======================
-// LOOP
-// =======================
+
+// =====================================================
+// MAIN LOOP
+// =====================================================
 void loop() {
-  // ==== IR READ ====
+  // ---------- IR READ ----------
   if (IrReceiver.decode()) {
     unsigned long code = IrReceiver.decodedIRData.decodedRawData;
+
+    // Ignore repeat signal (0x0)
     if (code != 0x0) lastCode = code;
     lastPressTime = millis();
-    // ===== MODE SWITCHING (LED SET HERE ONLY) =====
-    if (lastCode == BTN_MODE1) { mode = 1; ledMode1(); Serial.println("MODE 1"); }
-    if (lastCode == BTN_MODE2) { mode = 2; ledMode2(); Serial.println("MODE 2"); }
-    if (lastCode == BTN_MODE3) { mode = 3; ledMode3(); Serial.println("MODE 3"); }
-    if (lastCode == BTN_MODE4) { mode = 4; ledMode4(); Serial.println("MODE 4"); }
-    IrReceiver.resume();
+
+    // ---------- MODE SWITCHING ----------
+    if (lastCode == BTN_MODE1) { mode = 1; ledMode1(); }
+    if (lastCode == BTN_MODE2) { mode = 2; ledMode2(); }
+    if (lastCode == BTN_MODE3) { mode = 3; ledMode3(); }
+    if (lastCode == BTN_MODE4) { mode = 4; ledMode4(); }
+
+    IrReceiver.resume();             // Ready for next IR signal
   }
-  // ===== EXECUTE CURRENT MODE =====
-  switch(mode){
+
+  // ---------- EXECUTE CURRENT MODE ----------
+  switch(mode) {
     case 1: modeIRControl(); break;
     case 2: modeAnalogSensor(); break;
     case 3: modeUltrasonic(); break;
     case 4: modeVictoryLap(); break;
   }
 }
-// =======================
-// MODE 1 – IR HOLD TO MOVE
-// =======================
+
+// =====================================================
+// MODE 1 – IR HOLD-TO-MOVE CONTROL
+// =====================================================
 void modeIRControl() {
-  if (lastCode == BTN_OK){
+  // Increase speed when OK button is pressed
+  if (lastCode == BTN_OK) {
     y += SPEED_STEP;
-    if(y > MAX_SPEED) y = MIN_SPEED;
+    if (y > MAX_SPEED) y = MIN_SPEED;
     Serial.print("Speed = "); Serial.println(y);
     lastCode = 0;
   }
-  if (millis() - lastPressTime > RELEASE_TIMEOUT){
+
+  // Stop motors if button released
+  if (millis() - lastPressTime > RELEASE_TIMEOUT) {
     stopMotors();
     return;
   }
-  switch(lastCode){
-    case BTN_UP:      forward(y); break;
-    case BTN_DOWN:    backward(y); break;
-    case BTN_LEFT:    left(y); break;
-    case BTN_RIGHT:   right(y); break;
-    default:          stopMotors(); break;
+
+  // Direction control
+  switch(lastCode) {
+    case BTN_UP:    forward(y);  break;
+    case BTN_DOWN:  backward(y); break;
+    case BTN_LEFT:  left(y);     break;
+    case BTN_RIGHT: right(y);    break;
+    default:        stopMotors();break;
   }
 }
-// =======================
-// MODE 2 – ANALOG SENSOR
-// =======================
+
+// =====================================================
+// MODE 2 – ANALOG SENSOR CONTROL
+// =====================================================
 void modeAnalogSensor() {
-  float R = analogRead(A0);
-  float M = analogRead(A1);
-  float L = analogRead(A2);
+  float R = analogRead(A0);         // Right sensor
+  float M = analogRead(A1);         // Middle sensor
+  float L = analogRead(A2);         // Left sensor
+
   if (M > 1000) { stopMotors(); return; }
-  if (L > 300) { left(50); return; }
-  if (M > 300) { forward(50); return; }
-  if (R > 300) { right(50); return; }
-  right(50);
+  if (L > 300)  { left(50);   return; }
+  if (M > 300)  { forward(50);return; }
+  if (R > 300)  { right(50);  return; }
+
+  right(50);                        // Default behavior
 }
-// =======================
-// MODE 3 – ULTRASONIC AVOID (UPDATED)
-// =======================
+
+// =====================================================
+// MODE 3 – ULTRASONIC OBSTACLE AVOIDANCE
+// =====================================================
 void modeUltrasonic() {
-  // Look forward
-  myservo.write(90);
+  myservo.write(90);                                // Look forward
   float forwardDistance = DistanceMeter();
-  if (forwardDistance == 0) {
+
+  // No obstacle or out of range → go forward
+  if (forwardDistance == 0 || forwardDistance >= 25) {
     forward(70);
     return;
   }
-  if (forwardDistance >= 25) {
-    forward(70);
-    return;
-  }
+
   stopMotors();
   delay(200);
-  // LOOK LEFT
+
+  // Look LEFT
   myservo.write(180);
   delay(400);
   float leftDistance = DistanceMeter();
   if (leftDistance == 0) leftDistance = 300;
+
   if (leftDistance > 25) {
-    Serial.println("Turning LEFT...");
     left(70);
     delay(500);
     return;
   }
-  // LOOK RIGHT
+
+  // Look RIGHT
   myservo.write(0);
   delay(400);
   float rightDistance = DistanceMeter();
   if (rightDistance == 0) rightDistance = 300;
-  Serial.print("Right distance: ");
-  Serial.println(rightDistance);
-  // RIGHT BLOCKED → BACKWARD + 180 TURN + FORWARD
+
+  // Right blocked → back up and 180° turn
   if (rightDistance < 25) {
-    Serial.println("RIGHT BLOCKED → BACKWARD + 180 TURN");
     backward(70);
     delay(600);
     left(70);
@@ -176,51 +207,55 @@ void modeUltrasonic() {
     delay(500);
     return;
   }
-  // RIGHT SAFE → turn right normally
-  if (rightDistance > 25) {
-    Serial.println("Turning RIGHT...");
-    right(70);
-    delay(500);
-    return;
-  }
-  stopMotors();
+
+  // Right clear → normal right turn
+  right(70);
+  delay(500);
 }
-// =======================
-// ULTRASONIC DISTANCE FUNCTION
-// =======================
+
+// =====================================================
+// ULTRASONIC DISTANCE MEASUREMENT FUNCTION
+// =====================================================
 float DistanceMeter() {
   digitalWrite(Trig, LOW);
   delayMicroseconds(2);
   digitalWrite(Trig, HIGH);
   delayMicroseconds(10);
   digitalWrite(Trig, LOW);
-  long duration = pulseIn(Echo, HIGH, 25000);
+
+  long duration = pulseIn(Echo, HIGH, 25000);  // Timeout 25 ms
   if (duration == 0) return 0;
-  float distance = (duration * 0.0343) / 2.0;
+
+  float distance = (duration * 0.0343) / 2.0;  // Convert to cm
   if (distance > 300) return 0;
   return distance;
 }
-// =======================
-// MODE 4 – VICTORY LAP RECTANGLE
-// =======================
+
+// =====================================================
+// MODE 4 – VICTORY LAP (RECTANGLE PATH)
+// =====================================================
 void modeVictoryLap() {
   forward(50); delay(12000);
-  left(50); delay(600);
+  left(50);    delay(600);
   forward(50); delay(5000);
-  left(50); delay(600);
+  left(50);    delay(600);
   forward(50); delay(12000);
-  left(50); delay(600);
+  left(50);    delay(600);
   forward(50); delay(5000);
-  left(50); delay(600);
+  left(50);    delay(600);
+
   // Celebration spin
   left(70); delay(2000);
   stopMotors();
 }
-// =======================
-// MOTOR FUNCTIONS
-// =======================
-void forward(int s){ digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,HIGH); analogWrite(PWMB,s); }
-void backward(int s){ digitalWrite(AIN1,LOW); analogWrite(PWMA,s); digitalWrite(BIN1,LOW); analogWrite(PWMB,s); }
-void left(int s){ digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,LOW); analogWrite(PWMB,s); }
-void right(int s){ digitalWrite(AIN1,LOW); analogWrite(PWMA,s); digitalWrite(BIN1,HIGH); analogWrite(PWMB,s); }
-void stopMotors(){ analogWrite(PWMA,0); analogWrite(PWMB,0); }
+
+// =====================================================
+// MOTOR CONTROL FUNCTIONS
+// =====================================================
+void forward(int s)  { digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,HIGH); analogWrite(PWMB,s); }
+void backward(int s) { digitalWrite(AIN1,LOW);  analogWrite(PWMA,s); digitalWrite(BIN1,LOW);  analogWrite(PWMB,s); }
+void left(int s)     { digitalWrite(AIN1,HIGH); analogWrite(PWMA,s); digitalWrite(BIN1,LOW);  analogWrite(PWMB,s); }
+void right(int s)    { digitalWrite(AIN1,LOW);  analogWrite(PWMA,s); digitalWrite(BIN1,HIGH); analogWrite(PWMB,s); }
+void stopMotors()    { analogWrite(PWMA,0); analogWrite(PWMB,0); }
+```
+
