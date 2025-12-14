@@ -1,26 +1,53 @@
-#include <Adafruit_NeoPixel.h>
+#include <Adafruit_NeoPixel.h>   // Library used to control NeoPixel RGB LEDs
 
-// ===== NeoPixel CONFIG =====
-#define LED_PIN 4
-#define NUM_LEDS 1
+// =====================================================
+//                NEOPIXEL CONFIGURATION
+// =====================================================
+#define LED_PIN 4               // Digital pin connected to NeoPixel data line
+#define NUM_LEDS 1              // Number of NeoPixels being used
 
+// Create NeoPixel object:
+// - NUM_LEDS = how many LEDs
+// - LED_PIN = data pin
+// - NEO_GRB + NEO_KHZ800 = color order and signal speed
 Adafruit_NeoPixel led(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// Initialize NeoPixel (call in setup)
+// =====================================================
+//            INITIALIZE NEOPIXEL (CALL IN SETUP)
+// =====================================================
 void initNeoPixel() {
-  led.begin();
-  led.show();   // Turn off LED initially
+  led.begin();                  // Initialize the NeoPixel library
+  led.show();                   // Turn off LED (clear any old data)
 }
 
-// Set RGB color
+// =====================================================
+//              SET LED COLOR FUNCTION
+// =====================================================
 void setColor(uint8_t r, uint8_t g, uint8_t b) {
-  led.setPixelColor(0, led.Color(r, g, b));
-  led.show();
+  led.setPixelColor(0,          // Select LED at index 0 (first LED)
+                    led.Color(r, g, b)); // Create RGB color value
+  led.show();                   // Send color data to the LED
 }
 
-// ===== MODE COLORS =====
-void colorMode1() { setColor(0, 0, 255); }     // Blue
-void colorMode2() { setColor(0, 255, 0); }     // Green
-void colorMode3() { setColor(255, 0, 0); }     // Red
-void colorMode4() { setColor(150, 0, 255); }   // Purple
-void colorLostLine() { setColor(255, 180, 0); }// Orange
+// =====================================================
+//              PRESET MODE COLORS
+// =====================================================
+void colorMode1() {             // Mode 1 indicator
+  setColor(0, 0, 255);          // Blue color
+}
+
+void colorMode2() {             // Mode 2 indicator
+  setColor(0, 255, 0);          // Green color
+}
+
+void colorMode3() {             // Mode 3 indicator
+  setColor(255, 0, 0);          // Red color
+}
+
+void colorMode4() {             // Mode 4 indicator
+  setColor(150, 0, 255);        // Purple color
+}
+
+void colorLostLine() {          // Line lost / error indicator
+  setColor(255, 180, 0);        // Orange color
+}
